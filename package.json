@@ -11,8 +11,8 @@
     "npm": "*"
   },
   "scripts": {
-    "start": "npm run server",
-    "dev": "npm-run-all -p client server"
+     "server": "node server.js",
+    "start": "npm run server"
 },
   "repository": {
     "type": "git",
