@@ -31,7 +31,8 @@
     "url": "https://github.com/adhorrig/google-flights-wrapper/issues"
   },
   "homepage": "https://github.com/adhorrig/google-flights-wrapper#readme",
-  "express": {
+   "dependencies": {
+     "express": {
       "version": "4.16.3",
       "resolved": "https://registry.npmjs.org/express/-/express-4.16.3.tgz",
       "integrity": "sha1-avilAjUNsyRuzEvs9rWjTSL37VM=",
@@ -68,4 +69,5 @@
         "vary": "~1.1.2"
       }
     }
+   }
 }
