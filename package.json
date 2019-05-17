@@ -11,7 +11,7 @@
     "npm": "*"
   },
   "scripts": {
-    "start": "cd src && node index.js"
+    "start": "node server.js"
 },
   "repository": {
     "type": "git",
@@ -33,5 +33,5 @@
   "homepage": "https://github.com/adhorrig/google-flights-wrapper#readme",
   "dependencies": {
     "request": "^2.75.0"
-  }
+}
 }
