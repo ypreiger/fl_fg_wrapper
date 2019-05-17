@@ -1,125 +1,158 @@
-//  OpenShift sample Node application
-var express = require('express'),
-    app     = express(),
-    morgan  = require('morgan');
-    
-Object.assign=require('object-assign')
+#!/bin/env node
 
-app.engine('html', require('ejs').renderFile);
-app.use(morgan('combined'))
+var AppContainer = function () {
+  //  Scope.
+  var self = this;
+  /*  ================================================================  */
+  /*  Helper functions.                                                 */
+  /*  ================================================================  */
 
-var port = process.env.PORT || process.env.OPENSHIFT_NODEJS_PORT || 8080,
-    ip   = process.env.IP   || process.env.OPENSHIFT_NODEJS_IP || '0.0.0.0',
-    mongoURL = process.env.OPENSHIFT_MONGODB_DB_URL || process.env.MONGO_URL,
-    mongoURLLabel = "";
+  /**
+   *  Set up server IP address and port # using env variables/defaults.
+   */
+  self.setupVariables = function () {
+    //  Set the environment variables we need.
+    self.ipaddress = process.env.OPENSHIFT_NODEJS_IP;
+    self.port = process.env.OPENSHIFT_NODEJS_PORT || 8080;
 
-if (mongoURL == null) {
-  var mongoHost, mongoPort, mongoDatabase, mongoPassword, mongoUser;
-  // If using plane old env vars via service discovery
-  if (process.env.DATABASE_SERVICE_NAME) {
-    var mongoServiceName = process.env.DATABASE_SERVICE_NAME.toUpperCase();
-    mongoHost = process.env[mongoServiceName + '_SERVICE_HOST'];
-    mongoPort = process.env[mongoServiceName + '_SERVICE_PORT'];
-    mongoDatabase = process.env[mongoServiceName + '_DATABASE'];
-    mongoPassword = process.env[mongoServiceName + '_PASSWORD'];
-    mongoUser = process.env[mongoServiceName + '_USER'];
+    if (typeof self.ipaddress === "undefined") {
+      //  Log errors on OpenShift but continue w/ 127.0.0.1 - this
+      //  allows us to run/test the app locally.
+      console.warn('No OPENSHIFT_NODEJS_IP var, using 127.0.0.1');
+      self.ipaddress = "127.0.0.1";
+    }
+  };
 
-  // If using env vars from secret from service binding  
-  } else if (process.env.database_name) {
-    mongoDatabase = process.env.database_name;
-    mongoPassword = process.env.password;
-    mongoUser = process.env.username;
-    var mongoUriParts = process.env.uri && process.env.uri.split("//");
-    if (mongoUriParts.length == 2) {
-      mongoUriParts = mongoUriParts[1].split(":");
-      if (mongoUriParts && mongoUriParts.length == 2) {
-        mongoHost = mongoUriParts[0];
-        mongoPort = mongoUriParts[1];
+  /**
+   *  terminator === the termination handler
+   *  Terminate server on receipt of the specified signal.
+   *  @param {string} sig  Signal to terminate on.
+   */
+  self.terminator = function (sig) {
+    if (typeof sig === "string") {
+      console.log('%s: Received %s - terminating sample app ...',
+        Date(Date.now()), sig);
+      process.exit(1);
+    }
+    console.log('%s: Node server stopped.', Date(Date.now()));
+  };
+
+
+  /**
+   *  Setup termination handlers (for exit and a list of signals).
+   */
+  self.setupTerminationHandlers = function () {
+    //  Process on exit and signals.
+    process.on('exit', function () {
+      self.terminator();
+    });
+
+    // Removed 'SIGPIPE' from the list - bugz 852598.
+    ['SIGHUP', 'SIGINT', 'SIGQUIT', 'SIGILL', 'SIGTRAP', 'SIGABRT',
+      'SIGBUS', 'SIGFPE', 'SIGUSR1', 'SIGSEGV', 'SIGUSR2', 'SIGTERM'
+    ].forEach(function (element, index, array) {
+        process.on(element, function () {
+          self.terminator(element);
+        });
+      });
+  };
+
+  /**
+   *  Initializes the sample application.
+   */
+  self.initialize = function () {
+    self.setupVariables();
+    self.setupTerminationHandlers();
+  };
+
+
+  self.setupServer = function () {
+
+    /**
+     * Module dependencies.
+     */
+    var app = require('./app');
+    var http = require('http');
+    /**
+     * Get port from environment and store in Express.
+     */
+    var port = normalizePort(self.port);
+    /**
+     * Create HTTP server.
+     */
+    var server = http.createServer(app);
+    /**
+     * Listen on provided port, on all network interfaces.
+     */
+    server.listen(self.port, self.ipaddress, function () {
+      console.log('%s: Node server started on %s:%d ...',
+        Date(Date.now()), self.ipaddress, self.port);
+    });
+    server.on('error', onError);
+    server.on('listening', onListening);
+
+    /**
+     * Normalize a port into a number, string, or false.
+     */
+    function normalizePort(val) {
+      var port = parseInt(val, 10);
+
+      if (isNaN(port)) {
+        // named pipe
+        return val;
+      }
+
+      if (port >= 0) {
+        // port number
+        return port;
+      }
+
+      return false;
+    }
+
+    /**
+     * Event listener for HTTP server "error" event.
+     */
+
+    function onError(error) {
+      if (error.syscall !== 'listen') {
+        throw error;
+      }
+
+      var bind = typeof port === 'string'
+        ? 'Pipe ' + port
+        : 'Port ' + port;
+
+      // handle specific listen errors with friendly messages
+      switch (error.code) {
+        case 'EACCES':
+          console.error(bind + ' requires elevated privileges');
+          process.exit(1);
+          break;
+        case 'EADDRINUSE':
+          console.error(bind + ' is already in use');
+          process.exit(1);
+          break;
+        default:
+          throw error;
       }
     }
-  }
 
-  if (mongoHost && mongoPort && mongoDatabase) {
-    mongoURLLabel = mongoURL = 'mongodb://';
-    if (mongoUser && mongoPassword) {
-      mongoURL += mongoUser + ':' + mongoPassword + '@';
+    /**
+     * Event listener for HTTP server "listening" event.
+     */
+
+    function onListening() {
+      var addr = server.address();
+      console.log('Server on port : ' + addr.port);
     }
-    // Provide UI label that excludes user id and pw
-    mongoURLLabel += mongoHost + ':' + mongoPort + '/' + mongoDatabase;
-    mongoURL += mongoHost + ':' +  mongoPort + '/' + mongoDatabase;
-  }
-}
-var db = null,
-    dbDetails = new Object();
-
-var initDb = function(callback) {
-  if (mongoURL == null) return;
-
-  var mongodb = require('mongodb');
-  if (mongodb == null) return;
-
-  mongodb.connect(mongoURL, function(err, conn) {
-    if (err) {
-      callback(err);
-      return;
-    }
-
-    db = conn;
-    dbDetails.databaseName = db.databaseName;
-    dbDetails.url = mongoURLLabel;
-    dbDetails.type = 'MongoDB';
-
-    console.log('Connected to MongoDB at: %s', mongoURL);
-  });
+  };
 };
 
-app.get('/', function (req, res) {
-  // try to initialize the db on every request if it's not already
-  // initialized.
-  if (!db) {
-    initDb(function(err){});
-  }
-  if (db) {
-    var col = db.collection('counts');
-    // Create a document with request IP and current time of request
-    col.insert({ip: req.ip, date: Date.now()});
-    col.count(function(err, count){
-      if (err) {
-        console.log('Error running count. Message:\n'+err);
-      }
-      res.render('index.html', { pageCountMessage : count, dbInfo: dbDetails });
-    });
-  } else {
-    res.render('index.html', { pageCountMessage : null});
-  }
-});
 
-app.get('/pagecount', function (req, res) {
-  // try to initialize the db on every request if it's not already
-  // initialized.
-  if (!db) {
-    initDb(function(err){});
-  }
-  if (db) {
-    db.collection('counts').count(function(err, count ){
-      res.send('{ pageCount: ' + count + '}');
-    });
-  } else {
-    res.send('{ pageCount: -1 }');
-  }
-});
-
-// error handling
-app.use(function(err, req, res, next){
-  console.error(err.stack);
-  res.status(500).send('Something bad happened!');
-});
-
-initDb(function(err){
-  console.log('Error connecting to Mongo. Message:\n'+err);
-});
-
-app.listen(port, ip);
-console.log('Server running on http://%s:%s', ip, port);
-
-module.exports = app ;
+/**
+ *  main():  Main code.
+ */
+var zapp = new AppContainer();
+zapp.initialize();
+zapp.setupServer();
