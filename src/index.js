@@ -17,7 +17,7 @@ module.exports = (apikey) => {
         let info = [];
         let jsonObject = {};
         const airline = "LY";
-        const price "0";
+        const price = "0";
 
         if(body.error) return console.error(body.error);
         for(i=0; i < body.trips.tripOption.length; i++){
