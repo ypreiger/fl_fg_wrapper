@@ -71,7 +71,7 @@ var AppContainer = function () {
     /**
      * Module dependencies.
      */
-    var app = require('./app');
+    var app = require('./src');
     var http = require('http');
     /**
      * Get port from environment and store in Express.
