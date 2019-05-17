@@ -11,9 +11,15 @@
     "npm": "*"
   },
   "scripts": {
-    "start": "node server.js",
-    "test": "IP=0.0.0.0 PORT=3030 mocha --timeout 5000 tests/*_test.js"
-  },
+    "postinstall": "npm run build",
+    "server": "cd server && node server.js",
+    "client": "react-scripts start",
+    "start": "npm run server",
+    "dev": "npm-run-all -p client server",
+    "build": "react-scripts build",
+    "test": "react-scripts test --env=jsdom",
+    "eject": "react-scripts eject"
+},
   "repository": {
     "type": "git",
     "url": "git+https://github.com/adhorrig/google-flights-wrapper.git"
